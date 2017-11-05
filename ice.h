@@ -24,6 +24,7 @@
 #include "dtls.h"
 #include "sctp.h"
 #include "rtcp.h"
+#include "text2pcap.h"
 #include "utils.h"
 #include "plugins/plugin.h"
 
@@ -335,6 +336,10 @@ struct janus_ice_handle {
 	guint srtp_errors_count;
 	/*! \brief Count of the recent SRTP replay errors, in order to avoid spamming the logs */
 	gint last_srtp_error;
+	/*! \brief Flag to decide whether or not packets need to be dumped to a text2pcap file */
+	volatile gint dump_packets;
+	/*! \brief In case this session must be saved to text2pcap, the instance to dump packets to */
+	janus_text2pcap *text2pcap;
 	/*! \brief Mutex to lock/unlock the ICE session */
 	janus_mutex mutex;
 };
@@ -359,6 +364,12 @@ struct janus_ice_stream {
 	guint32 video_ssrc_peer;
 	/*! \brief Video retransmissions SSRC of the peer for this stream (may be bundled) */
 	guint32 video_ssrc_peer_rtx;
+	/*! \brief Video SSRC (simulcasted 1) of the peer for this stream (may be bundled) */
+	guint32 video_ssrc_peer_sim_1;
+	/*! \brief Video SSRC (simulcasted 2) of the peer for this stream (may be bundled) */
+	guint32 video_ssrc_peer_sim_2;
+	/*! \brief Array of RTP Stream IDs (for Firefox simulcasting, if enabled) */
+	char *rid[3];
 	/*! \brief List of payload types we can expect for audio */
 	GList *audio_payload_types;
 	/*! \brief List of payload types we can expect for video */
@@ -434,6 +445,10 @@ struct janus_ice_component {
 	GSource *dtlsrt_source;
 	/*! \brief DTLS-SRTP stack */
 	janus_dtls_srtp *dtls;
+	/*! \brief Whether we should do NACKs (in or out) for audio */
+	gboolean do_audio_nacks;
+	/*! \brief Whether we should do NACKs (in or out) for video */
+	gboolean do_video_nacks;
 	/*! \brief List of previously sent janus_rtp_packet RTP packets, in case we receive NACKs */
 	GList *retransmit_buffer;
 	/*! \brief Last time a log message about sending retransmits was printed */
