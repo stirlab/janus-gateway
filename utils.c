@@ -4,7 +4,7 @@
  * \brief    Utilities and helpers
  * \details  Implementations of a few methods that may be of use here
  * and there in the code.
- * 
+ *
  * \ingroup core
  * \ref core
  */
@@ -52,10 +52,8 @@ gboolean janus_strcmp_const_time(const void *str1, const void *str2) {
 	if(strlen((char *)string2) > maxlen)
 		maxlen = strlen((char *)string2);
 	unsigned char *buf1 = g_malloc0(maxlen+1);
-	memset(buf1, 0, maxlen);
 	memcpy(buf1, string1, strlen(str1));
 	unsigned char *buf2 = g_malloc0(maxlen+1);
-	memset(buf2, 0, maxlen);
 	memcpy(buf2, string2, strlen(str2));
 	unsigned char result = 0;
 	size_t i = 0;
@@ -90,31 +88,31 @@ guint64 janus_random_uint64(void) {
 }
 
 guint64 *janus_uint64_dup(guint64 num) {
-	guint64 *numdup = g_malloc0(sizeof(guint64));
-	memcpy(numdup, &num, sizeof(num));
+	guint64 *numdup = g_malloc(sizeof(guint64));
+	*numdup = num;
 	return numdup;
 }
 
 void janus_flags_reset(janus_flags *flags) {
 	if(flags != NULL)
-		*flags = 0;
+		g_atomic_pointer_set(flags, 0);
 }
 
-void janus_flags_set(janus_flags *flags, uint32_t flag) {
+void janus_flags_set(janus_flags *flags, gsize flag) {
 	if(flags != NULL) {
-		*flags |= flag;
+		g_atomic_pointer_or(flags, flag);
 	}
 }
 
-void janus_flags_clear(janus_flags *flags, uint32_t flag) {
+void janus_flags_clear(janus_flags *flags, gsize flag) {
 	if(flags != NULL) {
-		*flags &= ~(flag);
+		g_atomic_pointer_and(flags, ~(flag));
 	}
 }
 
-gboolean janus_flags_is_set(janus_flags *flags, uint32_t flag) {
+gboolean janus_flags_is_set(janus_flags *flags, gsize flag) {
 	if(flags != NULL) {
-		uint32_t bit = *flags & flag;
+		gsize bit = ((gsize) g_atomic_pointer_get(flags)) & flag;
 		return (bit != 0);
 	}
 	return FALSE;
@@ -163,10 +161,6 @@ char *janus_string_replace(char *message, const char *old_string, const char *ne
 		uint16_t old_stringlen = strlen(outgoing)+1, new_stringlen = old_stringlen + diff*counter;
 		if(diff > 0) {	/* Resize now */
 			tmp = g_realloc(outgoing, new_stringlen);
-			if(!tmp) {
-				g_free(outgoing);
-				return NULL;
-			}
 			outgoing = tmp;
 		}
 		/* Replace string */
@@ -189,10 +183,6 @@ char *janus_string_replace(char *message, const char *old_string, const char *ne
 		}
 		if(diff < 0) {	/* We skipped the resize previously (shrinking memory) */
 			tmp = g_realloc(outgoing, new_stringlen);
-			if(!tmp) {
-				g_free(outgoing);
-				return NULL;
-			}
 			outgoing = tmp;
 		}
 		outgoing[strlen(outgoing)] = '\0';
@@ -346,9 +336,9 @@ const char *janus_get_codec_from_pt(const char *sdp, int pt) {
 						return "h264";
 					if(strstr(name, "opus") || strstr(name, "OPUS"))
 						return "opus";
-					if(strstr(name, "pcmu") || strstr(name, "PMCU"))
+					if(strstr(name, "pcmu") || strstr(name, "PCMU"))
 						return "pcmu";
-					if(strstr(name, "pcma") || strstr(name, "PMCA"))
+					if(strstr(name, "pcma") || strstr(name, "PCMA"))
 						return "pcma";
 					if(strstr(name, "g722") || strstr(name, "G722"))
 						return "g722";
@@ -376,7 +366,7 @@ int janus_pidfile_create(const char *file) {
 		return 0;
 	pidfile = g_strdup(file);
 	/* Try creating a PID file (or opening an existing one) */
-	pidfd = open(pidfile, O_RDWR|O_CREAT, 0644);
+	pidfd = open(pidfile, O_RDWR|O_CREAT|O_TRUNC, 0644);
 	if(pidfd < 0) {
 		JANUS_LOG(LOG_FATAL, "Error opening/creating PID file %s, does Janus have enough permissions?\n", pidfile);
 		return -1;
@@ -506,7 +496,7 @@ gboolean janus_json_is_valid(json_t *val, json_type jtype, unsigned int flags) {
 	# define swap2(d) d
 #endif
 
-gboolean janus_vp8_is_keyframe(char* buffer, int len) {
+gboolean janus_vp8_is_keyframe(const char *buffer, int len) {
 	if(!buffer || len < 0)
 		return FALSE;
 	/* Parse VP8 header now */
@@ -563,7 +553,7 @@ gboolean janus_vp8_is_keyframe(char* buffer, int len) {
 				unsigned char *c = (unsigned char *)buffer+3;
 				/* vet via sync code */
 				if(c[0]!=0x9d||c[1]!=0x01||c[2]!=0x2a) {
-					JANUS_LOG(LOG_WARN, "First 3-bytes after header not what they're supposed to be?\n");
+					JANUS_LOG(LOG_HUGE, "First 3-bytes after header not what they're supposed to be?\n");
 				} else {
 					int vp8w = swap2(*(unsigned short*)(c+3))&0x3fff;
 					int vp8ws = swap2(*(unsigned short*)(c+3))>>14;
@@ -579,7 +569,7 @@ gboolean janus_vp8_is_keyframe(char* buffer, int len) {
 	return FALSE;
 }
 
-gboolean janus_vp9_is_keyframe(char* buffer, int len) {
+gboolean janus_vp9_is_keyframe(const char *buffer, int len) {
 	if(!buffer || len < 0)
 		return FALSE;
 	/* Parse VP9 header now */
@@ -632,15 +622,15 @@ gboolean janus_vp9_is_keyframe(char* buffer, int len) {
 			uint i=0;
 			for(i=0; i<n_s; i++) {
 				/* Width */
-				uint16_t *w = (uint16_t *)buffer;
+				const uint16_t *w = (const uint16_t *)buffer;
 				int vp9w = ntohs(*w);
 				buffer += 2;
 				/* Height */
-				uint16_t *h = (uint16_t *)buffer;
+				const uint16_t *h = (const uint16_t *)buffer;
 				int vp9h = ntohs(*h);
 				buffer += 2;
 				if(vp9w || vp9h) {
-					JANUS_LOG(LOG_WARN, "Got a VP9 key frame: %dx%d\n", vp9w, vp9h);
+					JANUS_LOG(LOG_HUGE, "Got a VP9 key frame: %dx%d\n", vp9w, vp9h);
 					return TRUE;
 				}
 			}
@@ -650,18 +640,35 @@ gboolean janus_vp9_is_keyframe(char* buffer, int len) {
 	return FALSE;
 }
 
-gboolean janus_h264_is_keyframe(char* buffer, int len) {
+gboolean janus_h264_is_keyframe(const char *buffer, int len) {
 	if(!buffer || len < 0)
 		return FALSE;
 	/* Parse H264 header now */
 	uint8_t fragment = *buffer & 0x1F;
 	uint8_t nal = *(buffer+1) & 0x1F;
 	uint8_t start_bit = *(buffer+1) & 0x80;
-	JANUS_LOG(LOG_HUGE, "Fragment=%d, NAL=%d, Start=%d\n", fragment, nal, start_bit);
 	if(fragment == 5 ||
-			((fragment == 28 || fragment == 29) && nal == 5 && start_bit == 128)) {
+			((fragment == 28 || fragment == 29) && (nal == 5 || nal == 7) && start_bit == 128)) {
 		JANUS_LOG(LOG_HUGE, "Got an H264 key frame\n");
 		return TRUE;
+	} else if(fragment == 24) {
+		/* May we find an SPS in this STAP-A? */
+		buffer++;
+		int tot = len-1;
+		uint16_t psize = 0;
+		while(tot > 0) {
+			memcpy(&psize, buffer, 2);
+			psize = ntohs(psize);
+			buffer += 2;
+			tot -= 2;
+			int nal = *buffer & 0x1F;
+			if(nal == 7) {
+				JANUS_LOG(LOG_HUGE, "Got an SPS/PPS\n");
+				return TRUE;
+			}
+			buffer += psize;
+			tot -= psize;
+		}
 	}
 	/* If we got here it's not a key frame */
 	return FALSE;
@@ -936,4 +943,30 @@ int janus_vp9_parse_svc(char *buffer, int len, int *found,
 		}
 	}
 	return 0;
+}
+
+inline guint32 janus_push_bits(guint32 word, size_t num, guint32 val) {
+	return (word << num) | (val & (0xFFFFFFFF>>(32-num)));
+}
+
+inline void janus_set1(guint8 *data,size_t i,guint8 val) {
+	data[i] = val;
+}
+
+inline void janus_set2(guint8 *data,size_t i,guint32 val) {
+	data[i+1] = (guint8)(val);
+	data[i]   = (guint8)(val>>8);
+}
+
+inline void janus_set3(guint8 *data,size_t i,guint32 val) {
+	data[i+2] = (guint8)(val);
+	data[i+1] = (guint8)(val>>8);
+	data[i]   = (guint8)(val>>16);
+}
+
+inline void janus_set4(guint8 *data,size_t i,guint32 val) {
+	data[i+3] = (guint8)(val);
+	data[i+2] = (guint8)(val>>8);
+	data[i+1] = (guint8)(val>>16);
+	data[i]   = (guint8)(val>>24);
 }
