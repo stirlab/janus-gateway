@@ -42,7 +42,7 @@ Additionally, you'll need the following libraries and tools:
 All of those libraries are usually available on most of the most common distributions. Installing these libraries on a recent Fedora, for instance, is very simple:
 
     yum install libmicrohttpd-devel jansson-devel \
-       openssl-devel libsrtp-devel sofia-sip-devel glib-devel \
+       openssl-devel libsrtp-devel sofia-sip-devel glib2-devel \
        opus-devel libogg-devel libcurl-devel pkgconfig gengetopt \
        libconfig-devel libtool autoconf automake
 
@@ -77,11 +77,11 @@ If your distro ships a pre-1.5 version of libsrtp, you'll have to uninstall that
 	./configure --prefix=/usr --enable-openssl
 	make shared_library && sudo make install
 
-The instructions for version 2.x are practically the same. Notice that the following steps are for version 2.0.0, but there may be more recent versions available:
+The instructions for version 2.x are practically the same. Notice that the following steps are for version 2.2.0, but there may be more recent versions available:
 
-	wget https://github.com/cisco/libsrtp/archive/v2.0.0.tar.gz
-	tar xfv v2.0.0.tar.gz
-	cd libsrtp-2.0.0
+	wget https://github.com/cisco/libsrtp/archive/v2.2.0.tar.gz
+	tar xfv v2.2.0.tar.gz
+	cd libsrtp-2.2.0
 	./configure --prefix=/usr --enable-openssl
 	make shared_library && sudo make install
 
@@ -228,13 +228,13 @@ Everything else works exactly the same way as on Linux.
 ## Configure and start
 To start the server, you can use the `janus` executable. There are several things you can configure, either in a configuration file:
 
-	<installdir>/etc/janus/janus.cfg
+	<installdir>/etc/janus/janus.jcfg
 
 or on the command line:
 
 	<installdir>/bin/janus --help
 
-	janus 0.6.0
+	janus 0.7.4
 
 	Usage: janus [OPTIONS]...
 
@@ -285,8 +285,13 @@ or on the command line:
 	-t, --no-media-timer=number   Time (in s) that should pass with no media
                                   (audio or video) being received before Janus
                                   notifies you about this
+	-W, --slowlink-threshold=number
+                                  Number of lost packets (per s) that should
+                                  trigger a 'slowlink' Janus API event to users
 	-r, --rtp-port-range=min-max  Port range to use for RTP/RTCP (only available
 								  if the installed libnice supports it)
+	-B, --twcc-period=number      How often (in ms) to send TWCC feedback back to
+                                  senders, if negotiated (default=1s)
 	-n, --server-name=name        Public name of this Janus instance
                                   (default=MyJanusInstance)
 	-s, --session-timeout=number  Session timeout value, in seconds (default=60)

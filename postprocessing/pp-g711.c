@@ -169,7 +169,7 @@ int janus_pp_g711_process(FILE *file, janus_pp_frame_packet *list, int *working)
 			int i=0;
 			for(i=0; i<(tmp->seq-tmp->prev->seq-1); i++) {
 				/* FIXME We should actually also look at the timestamp differences */
-				JANUS_LOG(LOG_WARN, "[FILL] Writing silence (seq=%"SCNu16", index=%"SCNu16")\n",
+				JANUS_LOG(LOG_WARN, "[FILL] Writing silence (seq=%d, index=%d)\n",
 					tmp->prev->seq+i+1, i+1);
 				/* Add silence */
 				memset(samples, 0, num_samples*2);
@@ -244,6 +244,14 @@ int janus_pp_g711_process(FILE *file, janus_pp_frame_packet *list, int *working)
 void janus_pp_g711_close(void) {
 	/* Flush and close file */
 	if(wav_file != NULL) {
+		/* Update the header */
+		fseek(wav_file, 0, SEEK_END);
+		uint32_t size = ftell(wav_file) - 8;
+		fseek(wav_file, 4, SEEK_SET);
+		fwrite(&size, sizeof(uint32_t), 1, wav_file);
+		size += 8;
+		fseek(wav_file, 40, SEEK_SET);
+		fwrite(&size, sizeof(uint32_t), 1, wav_file);
 		fflush(wav_file);
 		fclose(wav_file);
 	}
